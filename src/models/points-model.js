@@ -1,15 +1,15 @@
-import PointAdapter from '../adapters/point-adapter.js';
-import { UpdateType } from '../const.js';
+import {UpdateType} from '../const.js';
+import Adapter from '../point-adapter.js';
 import Observable from '../framework/observable.js';
 
 export default class PointsModel extends Observable {
   #points = [];
-  #pointApiService = null;
+  #tripApiService = null;
   #isFailed = false;
 
-  constructor({pointApiService}) {
+  constructor({tripApiService}) {
     super();
-    this.#pointApiService = pointApiService;
+    this.#tripApiService = tripApiService;
   }
 
   get points() {
@@ -22,9 +22,8 @@ export default class PointsModel extends Observable {
 
   async init() {
     try {
-      const points = await this.#pointApiService.points;
-      this.#points = points.map(PointAdapter.adaptToClient);
-      this.#isFailed = false;
+      const points = await this.#tripApiService.getPoints();
+      this.#points = points.map(Adapter.adaptToClient);
     } catch(err) {
       this.#points = [];
       this.#isFailed = true;
@@ -34,20 +33,16 @@ export default class PointsModel extends Observable {
   }
 
   async updatePoint(updateType, update) {
-    const index = this.#points.findIndex((point) => point.id === update.id);
+    const oldPoint = this.#points.find((point) => point.id === update.id);
 
-    if (index === -1) {
+    if (!oldPoint) {
       throw new Error('Can\'t update unexisting task');
     }
 
     try {
-      const response = await this.#pointApiService.updatePoint(update);
-      const updatedPoint = PointAdapter.adaptToClient(response);
-      this.#points = [
-        ...this.#points.slice(0, index),
-        updatedPoint,
-        ...this.#points.slice(index + 1),
-      ];
+      const response = await this.#tripApiService.updatePoint(update);
+      const updatedPoint = Adapter.adaptToClient(response);
+      this.#points = this.#points.map((point) => point === oldPoint ? {...updatedPoint} : {...point});
       this._notify(updateType, update);
     } catch(err) {
       throw new Error('Can\'t update point');
@@ -56,8 +51,8 @@ export default class PointsModel extends Observable {
 
   async addPoint(updateType, update) {
     try {
-      const response = await this.#pointApiService.addPoint(update);
-      const newPoint = PointAdapter.adaptToClient(response);
+      const response = await this.#tripApiService.addPoint(update);
+      const newPoint = Adapter.adaptToClient(response);
       this.#points = [
         newPoint,
         ...this.#points,
@@ -76,12 +71,11 @@ export default class PointsModel extends Observable {
     }
 
     try {
-      await this.#pointApiService.deletePoint(update);
-      this.#points = this.#points.filter((point, pointIndex) => pointIndex !== index);
+      await this.#tripApiService.deletePoint(update);
+      this.#points = this.#points.filter((point) => point.id !== update.id);
       this._notify(updateType);
     } catch(err) {
       throw new Error('Can\'t delete task');
     }
   }
-
 }

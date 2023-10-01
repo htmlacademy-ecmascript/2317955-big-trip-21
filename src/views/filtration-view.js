@@ -1,18 +1,19 @@
-import {FILTRATION_OPTIONS } from '../const.js';
+import {FILTRATION_OPTIONS} from '../const.js';
 import AbstractView from '../framework/view/abstract-view.js';
 
-function createTemplate(filtrationInformation, currentFiltrationName) {
+function createTemplate(info, currentOptionName) {
   const filtrationTemplate = FILTRATION_OPTIONS.map((option) => {
-    const filterName = option.name;
+    const optionName = option.name;
+
     return /*html*/`
       <div class="trip-filters__filter">
         <input class="trip-filters__filter-input  visually-hidden" type="radio" name="trip-filter"
-          id="filter-${filterName}"
-          value="${filterName}"
-          ${filtrationInformation[filterName] ? '' : 'disabled'}
-          ${option.name === currentFiltrationName ? 'checked' : ''}>
-        <label class="trip-filters__filter-label" for="filter-${filterName}">
-          ${filterName}
+          id="filter-${optionName}"
+          value="${optionName}"
+          ${info[optionName] ? '' : 'disabled'}
+          ${option.name === currentOptionName ? 'checked' : ''}>
+        <label class="trip-filters__filter-label" for="filter-${optionName}">
+          ${optionName}
         </label>
       </div>
     `;
@@ -27,25 +28,24 @@ function createTemplate(filtrationInformation, currentFiltrationName) {
 }
 
 export default class FiltrationView extends AbstractView {
-  #filtrationInformation = null;
-  #currentFiltrationName = null;
-  #handleFilterTypeChange = null;
+  #info = null;
+  #currentOptionName = null;
+  #handleOptionChange = null;
 
-  constructor ({filtrationInformation, currentFiltrationName, onFilterTypeChange}) {
+  constructor ({info, currentOptionName, onOptionChange}) {
     super();
-    this.#filtrationInformation = filtrationInformation;
-    this.#currentFiltrationName = currentFiltrationName;
-    this.#handleFilterTypeChange = onFilterTypeChange;
+    this.#info = info;
+    this.#currentOptionName = currentOptionName;
+    this.#handleOptionChange = onOptionChange;
 
-    this.element.addEventListener('change', this.#filterTypeChangeHandler);
+    this.element.addEventListener('change', this.#optionChangeHandler);
   }
 
   get template() {
-    return createTemplate(this.#filtrationInformation, this.#currentFiltrationName);
+    return createTemplate(this.#info, this.#currentOptionName);
   }
 
-  #filterTypeChangeHandler = (evt) => {
-    evt.preventDefault();
-    this.#handleFilterTypeChange(evt.target.value);
+  #optionChangeHandler = (evt) => {
+    this.#handleOptionChange(evt.target.value);
   };
 }

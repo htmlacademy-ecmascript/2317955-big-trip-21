@@ -1,10 +1,18 @@
-import { BLANK_POINT, POINT_TYPES } from '../const.js';
-import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
-import flatpickr from 'flatpickr';
+import {BLANK_POINT} from '../const.js';
+import {isFormValid, makeFirstLetterCaptital} from '../utils/common.js';
 import he from 'he';
+import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
-import { isFormValid } from '../utils/common.js';
 import dayjs from 'dayjs';
+import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
+import { addMinutes } from '../utils/dates.js';
+
+const BASIC_DATEPICKER_SETTINGS = {
+  dateFormat: 'd/m/y H:i',
+  enableTime: true,
+  locale: {firstDayOfWeek: 1},
+  'time_24hr': true,
+};
 
 function createOffersTemplate(point, offers) {
   const offersByType = offers.find((offer) => offer.type === point.type).offers;
@@ -59,11 +67,9 @@ function createPicturesTemplate(pictures) {
 }
 
 function createDestinationTemplate(pointDestination) {
-  if (!pointDestination) {
-    return '';
-  }
-
-  if (pointDestination.description.length === 0 && pointDestination.pictures.length === 0) {
+  if (!pointDestination
+    || (pointDestination.description.length === 0 && pointDestination.pictures.length === 0)
+  ) {
     return '';
   }
 
@@ -89,7 +95,7 @@ function getSubmitButtonName(point) {
   return (point.isDeleting ? 'Deleting...' : 'Delete');
 }
 
-function createTemplate(point, allOffers, allDestinations) {
+function createTemplate(point, offers, allDestinations) {
   const pointId = point.id ? he.encode(point.id) : '';
   const pointType = he.encode(point.type);
   const pointPrice = he.encode(String(point.basePrice));
@@ -99,14 +105,16 @@ function createTemplate(point, allOffers, allDestinations) {
 
   const disableStatus = point.isDisabled ? 'disabled' : '';
 
-  const pointIconTemplate = POINT_TYPES.map((type) => /*html*/`
+  const types = offers.map((offersByType) => offersByType.type);
+
+  const pointIconTemplate = types.map((type) => /*html*/`
       <div class="event__type-item">
         <input class="event__type-input  visually-hidden" type="radio" name="event-type"
-          id="event-type-${type.toLowerCase()}-${pointId}"
+          id="event-type-${type}-${pointId}"
           value="${type}"
           ${pointType === type ? 'checked' : ''}
         >
-        <label class="event__type-label  event__type-label--${type.toLowerCase()}" for="event-type-${type.toLowerCase()}-${pointId}">${type}</label>
+        <label class="event__type-label  event__type-label--${type}" for="event-type-${type}-${pointId}">${makeFirstLetterCaptital(type)}</label>
       </div>
     `).join(' ');
 
@@ -140,7 +148,7 @@ function createTemplate(point, allOffers, allDestinations) {
             <label class="event__label  event__type-output" for="event-destination-1">
               ${pointType}
             </label>
-            <input required class="event__input  event__input--destination" id="event-destination-1" type="text" name="event-destination" list="destination-list-1"
+            <input required class="event__input  event__input--destination" id="event-destination-1" type="text" name="event-destination" list="destination-list-1" required
               value="${he.encode(pointDestinationInfo?.name ?? '')}"
               ${disableStatus}
             >
@@ -151,13 +159,13 @@ function createTemplate(point, allOffers, allDestinations) {
 
           <div class="event__field-group  event__field-group--time">
             <label class="visually-hidden" for="event-start-time-1">From</label>
-            <input class="event__input  event__input--time" id="event-start-time-1" type="text" name="event-start-time"
+            <input class="event__input  event__input--time" id="event-start-time-1" type="text" name="event-start-time" required
               value="${dateFromFormated ?? ''}"
               ${disableStatus}
             >
             —
             <label class="visually-hidden" for="event-end-time-1">To</label>
-            <input class="event__input  event__input--time" id="event-end-time-1" type="text" name="event-end-time"
+            <input class="event__input  event__input--time" id="event-end-time-1" type="text" name="event-end-time" required
               value="${dateToFormated ?? ''}"
               ${disableStatus}
             >
@@ -168,7 +176,7 @@ function createTemplate(point, allOffers, allDestinations) {
               <span class="visually-hidden">Price</span>
               &euro;
             </label>
-            <input class="event__input  event__input--price" id="event-price-1" type="number" name="event-price"
+            <input class="event__input  event__input--price" id="event-price-1" type="number" name="event-price" min="1" required
               value="${pointPrice}"
               ${disableStatus}
             >
@@ -189,7 +197,7 @@ function createTemplate(point, allOffers, allDestinations) {
             </button>`}
         </header>
         <section class="event__details">
-          ${createOffersTemplate(point, allOffers)}
+          ${createOffersTemplate(point, offers)}
           ${createDestinationTemplate(pointDestinationInfo)}
         </section>
       </form>
@@ -198,27 +206,35 @@ function createTemplate(point, allOffers, allDestinations) {
 }
 
 export default class FormView extends AbstractStatefulView {
-  offers = [];
-  #allDestinations = [];
-  #handleFormSubmit = null;
+  #offers = [];
+  #destinations = [];
+
   #datepickerTo = null;
   #datepickerFrom = null;
-  #handleDeleteClick = null;
+
+  #handleFormSubmit = null;
+  #handleDiscardClick = null;
   #handleCloseClick = null;
 
-  constructor({point = BLANK_POINT, onFormSubmit, offersByType, allDestinations, onDeleteClick, onCloseClick}) {
+  constructor({point = BLANK_POINT, offers, destinations, onFormSubmit, onDiscardClick, onCloseClick = null}) {
     super();
     this._setState(FormView.parsePointToState(point));
-    this.offers = offersByType;
-    this.#allDestinations = allDestinations;
+    this.#offers = offers;
+    this.#destinations = destinations;
     this.#handleFormSubmit = onFormSubmit;
-    this.#handleDeleteClick = onDeleteClick;
+    this.#handleDiscardClick = onDiscardClick;
     this.#handleCloseClick = onCloseClick;
+
     this._restoreHandlers();
   }
 
   get template() {
-    return createTemplate(this._state, this.offers, this.#allDestinations);
+    return createTemplate(this._state, this.#offers, this.#destinations);
+  }
+
+  updateElement(update) {
+    super.updateElement(update);
+    this.setDatePicker();
   }
 
   removeElement() {
@@ -237,22 +253,115 @@ export default class FormView extends AbstractStatefulView {
 
   _restoreHandlers() {
     this.element.querySelector('form').addEventListener('submit', this.#formSubmitHandler);
+    this.element.querySelector('.event__reset-btn').addEventListener('click', this.#formDiscardClickHandler);
+    this.element.querySelector('.event__rollup-btn')?.addEventListener('click', this.#formCloseClickHandler);
     this.element.querySelector('.event__type-group').addEventListener('change', this.#typeChangeHandler);
     this.element.querySelector('.event__input--destination').addEventListener('change', this.#destinationChangeHandler);
     this.element.querySelector('.event__input--price').addEventListener('change', this.#priceChangeHandler);
     this.element.querySelector('.event__details').addEventListener('click', this.#offersChangeHandler);
-    this.element.querySelector('.event__reset-btn').addEventListener('click', this.#formDeleteClickHandler);
-    this.element.querySelector('.event__rollup-btn')?.addEventListener('click', this.#formCloseClickHandler);
   }
 
   reset(point) {
-    this.updateElement(FormView.parsePointToState(point),);
+    this.updateElement(FormView.parsePointToState(point));
   }
 
-  updateElement(update) {
-    super.updateElement(update);
-    this.setDatePicker();
+  setDatePicker() {
+    const dateFrom = this._state.dateFrom;
+    const dateTo = this._state.dateTo;
+
+    this.#datepickerFrom = flatpickr(
+      this.element.querySelector('#event-start-time-1'),
+      {
+        ...BASIC_DATEPICKER_SETTINGS,
+        defaultDate: dateFrom,
+        onClose: this.#dateFromChangeHandler,
+        maxDate: dateTo === '' ? '' : addMinutes(dateTo, -1),
+      },
+    );
+
+    this.#datepickerTo = flatpickr(
+      this.element.querySelector('#event-end-time-1'),
+      {
+        ...BASIC_DATEPICKER_SETTINGS,
+        defaultDate: dateTo,
+        onClose: this.#dateToChangeHandler,
+        minDate: dateFrom === '' ? '' : addMinutes(dateFrom, 1),
+      },
+    );
   }
+
+  #validateForm() {
+    this.element.querySelector('.event__save-btn').disabled = !isFormValid(this._state);
+  }
+
+  #formSubmitHandler = (evt) => {
+    evt.preventDefault();
+    this.#handleFormSubmit(FormView.parseStateToPoint(this._state));
+  };
+
+  #formDiscardClickHandler = (evt) => {
+    evt.preventDefault();
+
+    if (this._state.id) {
+      this.#handleDiscardClick(FormView.parseStateToPoint(this._state));
+      return;
+    }
+
+    this.#handleDiscardClick();
+  };
+
+  #formCloseClickHandler = (evt) => {
+    evt.preventDefault();
+    this.#handleCloseClick();
+  };
+
+  #typeChangeHandler = (evt) => {
+    evt.preventDefault();
+    this.updateElement({type: evt.target.value.toLowerCase(), offers: []});
+  };
+
+  #destinationChangeHandler = (evt) => {
+    evt.preventDefault();
+    const chosenDestination = this.#destinations.find((destination) => destination.name === evt.target.value);
+    const chosenDestinationId = chosenDestination ? chosenDestination.id : '';
+    this.updateElement({destination: chosenDestinationId});
+  };
+
+  #priceChangeHandler = (evt) => {
+    evt.preventDefault();
+    this._setState({basePrice: evt.target.valueAsNumber});
+    this.#validateForm();
+  };
+
+  #offersChangeHandler = (evt) => {
+    if (!evt.target.classList.contains('event__offer-checkbox')) {
+      return;
+    }
+
+    const chosenOffers = this._state.offers;
+    const targetOfferId = evt.target.value;
+    const targetOfferIndex = chosenOffers.indexOf(targetOfferId);
+
+    if (targetOfferIndex >= 0) {
+      chosenOffers.splice(targetOfferIndex, 1);
+    } else {
+      chosenOffers.push(targetOfferId);
+    }
+
+    this._setState({offers: chosenOffers});
+  };
+
+  #dateFromChangeHandler = ([userDate]) => {
+    this._setState({dateFrom: userDate});
+    this.#datepickerTo.set({minDate: addMinutes(this._state.dateFrom, 1)});
+    this.#validateForm();
+  };
+
+  #dateToChangeHandler = ([userDate]) => {
+    this._setState({dateTo: userDate});
+    this.#datepickerFrom.set({maxDate: addMinutes(this._state.dateTo, -1)});
+    this.#validateForm();
+  };
 
   static parsePointToState(point) {
     return {
@@ -271,96 +380,5 @@ export default class FormView extends AbstractStatefulView {
     delete point.isDeleting;
 
     return point;
-  }
-
-  #formSubmitHandler = (evt) => {
-    evt.preventDefault();
-    this.#handleFormSubmit(FormView.parseStateToPoint(this._state));
-  };
-
-  #formDeleteClickHandler = (evt) => {
-    evt.preventDefault();
-    this.#handleDeleteClick(FormView.parseStateToPoint(this._state));
-  };
-
-  #formCloseClickHandler = () => {
-    this.#handleCloseClick();
-  };
-
-  #typeChangeHandler = (evt) => {
-    evt.preventDefault();
-    this.updateElement({type: evt.target.value.toLowerCase(), offers: []});
-  };
-
-  #destinationChangeHandler = (evt) => {
-    const chosenDestination = this.#allDestinations.find((destination) => destination.name === evt.target.value);
-    const chosenDestinationId = chosenDestination ? chosenDestination.id : '';
-
-    this.updateElement({destination: chosenDestinationId});
-  };
-
-  #priceChangeHandler = (evt) => {
-    const newPrice = parseInt(evt.target.value, 10);
-    this._setState({basePrice: (Number.isNaN(newPrice) ? 0 : newPrice) });
-    this.element.querySelector('.event__save-btn').disabled = !isFormValid(this._state);
-  };
-
-  #offersChangeHandler = (evt) => {
-    if (!evt.target.classList.contains('event__offer-checkbox')) {
-      return;
-    }
-
-    const chosenOffers = this._state.offers;
-    const offerId = evt.target.value;
-    const offerIndex = chosenOffers.indexOf(offerId);
-
-    if (offerIndex >= 0) {
-      chosenOffers.splice(offerIndex, 1);
-    } else {
-      chosenOffers.push(offerId);
-    }
-
-    this._setState({offers: chosenOffers});
-  };
-
-  #dateFromChangeHandler = ([userDate]) => {
-    this._setState({dateFrom: userDate});
-    this.#datepickerTo.set({minDate: this._state.dateFrom});
-    this.element.querySelector('.event__save-btn').disabled = !isFormValid(this._state);
-  };
-
-  #dateToChangeHandler = ([userDate]) => {
-    this._setState({dateTo: userDate});
-    this.#datepickerFrom.set({maxDate: this._state.dateTo});
-    this.element.querySelector('.event__save-btn').disabled = !isFormValid(this._state);
-  };
-
-  setDatePicker() {
-    const commonSettings = {
-      dateFormat: 'd/m/y H:i',
-      enableTime: true,
-      locale: {firstDayOfWeek: 1},
-      'time_24hr': true,
-    };
-
-    this.#datepickerFrom = flatpickr(
-      this.element.querySelector('#event-start-time-1'),
-      {
-        ...commonSettings,
-        defaultDate: this._state.dateFrom,
-        onClose: this.#dateFromChangeHandler,
-        maxDate: this._state.dateTo,
-      },
-    );
-
-    this.#datepickerTo = flatpickr(
-      this.element.querySelector('#event-end-time-1'),
-      {
-        ...commonSettings,
-        defaultDate: this._state.dateTo,
-        onClose: this.#dateToChangeHandler,
-        minDate: this._state.dateFrom,
-      },
-    );
   }
 }

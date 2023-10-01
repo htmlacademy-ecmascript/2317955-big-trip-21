@@ -1,17 +1,18 @@
 import {SORTING_OPTIONS} from '../const.js';
 import AbstractView from '../framework/view/abstract-view.js';
 
-function createTemplate(currentSortType) {
+function createTemplate(currentOptionName) {
   const buttonsTemplate = SORTING_OPTIONS.map((option) => {
-    const {name, isDisable} = option;
+    const {name, sortCb} = option;
+
     return /*html*/`
       <div class="trip-sort__item  trip-sort__item--${name}">
         <input class="trip-sort__input  visually-hidden" type="radio" name="trip-sort"
           id="sort-${name}"
           value="sort-${name}"
           data-sort-name="${name}"
-          ${isDisable ? 'disabled' : ''}
-          ${option.name === currentSortType ? 'checked' : ''}
+          ${sortCb ? '' : 'disabled'}
+          ${option.name === currentOptionName ? 'checked' : ''}
           >
         <label class="trip-sort__btn" for="sort-${name}">
           ${name}
@@ -28,26 +29,22 @@ function createTemplate(currentSortType) {
 }
 
 export default class SortingView extends AbstractView {
-  #handleSortTypeChange = null;
-  #currentSortType = null;
+  #currentOptionName = null;
+  #handleOptionChange = null;
 
-  constructor({onSortTypeChange, currentSortType}) {
+  constructor({currentOptionName, onOptionChange}) {
     super();
-    this.#currentSortType = currentSortType;
-    this.#handleSortTypeChange = onSortTypeChange;
+    this.#currentOptionName = currentOptionName;
+    this.#handleOptionChange = onOptionChange;
 
-    this.element.addEventListener('click', this.#sortTypeChangeHandler);
+    this.element.addEventListener('change', this.#optionChangeHandler);
   }
 
   get template() {
-    return createTemplate(this.#currentSortType);
+    return createTemplate(this.#currentOptionName);
   }
 
-  #sortTypeChangeHandler = (evt) => {
-    if (evt.target.tagName !== 'INPUT') {
-      return;
-    }
-
-    this.#handleSortTypeChange(evt.target.dataset.sortName);
+  #optionChangeHandler = (evt) => {
+    this.#handleOptionChange(evt.target.dataset.sortName);
   };
 }

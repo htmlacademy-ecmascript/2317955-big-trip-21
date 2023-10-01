@@ -1,18 +1,14 @@
 export default class DestinationsModel {
   #destinations = [];
-  #destinationsApiService = null;
+  #tripApiService = null;
   #isFailed = false;
 
-  constructor({destinationsApiService}) {
-    this.#destinationsApiService = destinationsApiService;
+  constructor({tripApiService}) {
+    this.#tripApiService = tripApiService;
   }
 
   get destinations() {
     return this.#destinations;
-  }
-
-  get allDestinationsNames() {
-    return this.#destinations.map((destination) => destination.name);
   }
 
   get isFailed() {
@@ -21,8 +17,7 @@ export default class DestinationsModel {
 
   async init() {
     try {
-      this.#destinations = await this.#destinationsApiService.destinations;
-      this.#isFailed = false;
+      this.#destinations = await this.#tripApiService.getDestinations();
     } catch(err) {
       this.#destinations = [];
       this.#isFailed = true;

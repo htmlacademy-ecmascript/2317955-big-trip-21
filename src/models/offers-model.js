@@ -1,18 +1,14 @@
 export default class OffersModel {
   #offers = [];
-  #offersApiService = null;
+  #tripApiService = null;
   #isFailed = false;
 
-  constructor({offersApiService}) {
-    this.#offersApiService = offersApiService;
+  constructor({tripApiService}) {
+    this.#tripApiService = tripApiService;
   }
 
   get offers() {
     return this.#offers;
-  }
-
-  get allOffers() {
-    return this.#offers.reduce((accumulator, offersByType) => [...accumulator, ...offersByType.offers], []);
   }
 
   get isFailed() {
@@ -21,31 +17,28 @@ export default class OffersModel {
 
   async init() {
     try {
-      this.#offers = await this.#offersApiService.offers;
-      this.#isFailed = false;
+      this.#offers = await this.#tripApiService.getOffers();
     } catch(err) {
       this.#offers = [];
       this.#isFailed = true;
     }
   }
 
+  // getTypes() {
+  //   return
+  // }
+
   getOffersByIds(offersIds) {
     if (offersIds.length === 0) {
       return [];
     }
 
+    const allOffers = this.#offers.reduce((accumulator, offersByType) => [...accumulator, ...offersByType.offers], []);
+
     return offersIds.reduce((accumulator, offerId) => {
-      const chosenOffer = this.allOffers.find((offer) => offer.id === offerId);
+      const chosenOffer = allOffers.find((offer) => offer.id === offerId);
 
-      if (chosenOffer) {
-        return [...accumulator, chosenOffer];
-      }
-
-      return accumulator;
+      return (chosenOffer ? [...accumulator, chosenOffer] : accumulator);
     }, []);
-  }
-
-  getOffersByType(type) {
-    return this.#offers.find((offer) => offer.type === type).offers;
   }
 }

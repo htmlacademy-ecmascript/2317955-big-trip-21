@@ -1,5 +1,8 @@
-import { showAll, showFuture, showPast, showPresent } from './utils/filters';
-import { sortByDay, sortByPrice, sortByTime } from './utils/sorting';
+import {showAll, showFuture, showPast, showPresent} from './utils/filtration-callbacks';
+import {compareByDateFrom, compareByPrice, compareByDuration} from './utils/sorting-callbacks';
+
+export const AUTHORIZATION = 'Basic id2317955';
+export const END_POINT = 'https://21.objects.pages.academy/big-trip';
 
 export const BLANK_POINT = {
   basePrice: 0,
@@ -10,9 +13,6 @@ export const BLANK_POINT = {
   offers: [],
   type: 'flight'
 };
-
-// мы должны хранить типы точек в константе или можем брать их из данных сервера?
-export const POINT_TYPES = ['Taxi', 'Bus', 'Train', 'Ship', 'Drive', 'Flight', 'Check-in', 'Sightseeing', 'Restaurant'];
 
 export const DEFAULT_NO_POINT_MESSAGE = 'Failed to load latest route information';
 
@@ -39,37 +39,32 @@ export const FILTRATION_OPTIONS = [
   },
 ];
 
-export const DEFAULT_FILTRATION = FILTRATION_OPTIONS[0];
+export const DEFAULT_FILTRATION_OPTION = FILTRATION_OPTIONS[0];
 
 export const SORTING_OPTIONS = [
   {
     name: 'day',
-    sortCb: sortByDay,
-    isDisable: false,
+    sortCb: compareByDateFrom,
   },
   {
     name: 'event',
     sortCb: null,
-    isDisable: true,
   },
   {
     name: 'time',
-    sortCb: sortByTime,
-    isDisable: false,
+    sortCb: compareByDuration,
   },
   {
     name: 'price',
-    sortCb: sortByPrice,
-    isDisable: false,
+    sortCb: compareByPrice,
   },
   {
     name: 'offers',
     sortCb: null,
-    isDisable: true,
   },
 ];
 
-export const DEFAULT_SORTING = SORTING_OPTIONS[0];
+export const DEFAULT_SORTING_OPTION = SORTING_OPTIONS[0];
 
 export const UserAction = {
   UPDATE_POINT: 'UPDATE_POINT',
@@ -100,4 +95,9 @@ export const ServerPaths = {
 export const TimeLimit = {
   LOWER_LIMIT: 350,
   UPPER_LIMIT: 1000,
+};
+
+export const Mode = {
+  DEFAULT: 'DEFAULT',
+  EDITING: 'EDITING',
 };
